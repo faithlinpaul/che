@@ -574,4 +574,8 @@ public class DockerInstanceProvider implements InstanceProvider {
                     .filter(path -> !Strings.isNullOrEmpty(path))
                     .collect(Collectors.toSet());
     }
+
+    private void createNetworkIfNeeded(String networkName) {
+        //todo
+    }
 }
