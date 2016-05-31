@@ -29,4 +29,6 @@ public interface EnvironmentEngine {
                                                                                      ConflictException;
 
     void stop(String workspaceId) throws NotFoundException, ServerException;
+
+    void stopMachine(String machineId) throws NotFoundException, ServerException;
 }

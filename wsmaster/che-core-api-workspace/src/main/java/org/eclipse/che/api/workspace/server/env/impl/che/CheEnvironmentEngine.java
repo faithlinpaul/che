@@ -135,6 +135,11 @@ public class CheEnvironmentEngine implements EnvironmentEngine {
         }
     }
 
+    @Override
+    public void stopMachine(String machineId) throws NotFoundException, ServerException {
+
+    }
+
     @VisibleForTesting
     void cleanupStartResources(String workspaceId) {
         acquireWriteLock(workspaceId);

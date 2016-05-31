@@ -157,10 +157,11 @@ public class WorkspaceRuntimes {
                                    boolean recover) throws ServerException,
                                                            ConflictException,
                                                            NotFoundException {
+        String workspaceId = workspace.getId();
         final Optional<EnvironmentImpl> environmentOpt = workspace.getConfig().getEnvironment(envName);
         if (!environmentOpt.isPresent()) {
             throw new IllegalArgumentException(format("Workspace '%s' doesn't contain environment '%s'",
-                                                      workspace.getId(),
+                                                      workspaceId,
                                                       envName));
         }
 
@@ -182,10 +183,10 @@ public class WorkspaceRuntimes {
         // The double check is required as it is still possible to get unlucky timing
         // between locking and starting workspace.
         ensurePreDestroyIsNotExecuted();
-        acquireWriteLock(workspace.getId());
+        acquireWriteLock(workspaceId);
         try {
             ensurePreDestroyIsNotExecuted();
-            final RuntimeDescriptor existingDescriptor = descriptors.get(workspace.getId());
+            final RuntimeDescriptor existingDescriptor = descriptors.get(workspaceId);
             if (existingDescriptor != null) {
                 throw new ConflictException(format("Could not start workspace '%s' because its status is '%s'",
                                                    workspace.getConfig().getName(),
@@ -195,15 +196,15 @@ public class WorkspaceRuntimes {
             // Create a new runtime descriptor and save it with 'STARTING' status
             final RuntimeDescriptor descriptor = new RuntimeDescriptor(new WorkspaceRuntimeImpl(envName, environmentCopy.getType()));
             descriptor.setRuntimeStatus(WorkspaceStatus.STARTING);
-            descriptors.put(workspace.getId(), descriptor);
+            descriptors.put(workspaceId, descriptor);
         } finally {
-            releaseWriteLock(workspace.getId());
+            releaseWriteLock(workspaceId);
         }
 
         // todo should we declare that environment should start dev machine or not?
         ensurePreDestroyIsNotExecuted();
-        publishEvent(EventType.STARTING, workspace.getId(), null);
-        List<Machine> machines = engine.start(workspace.getId(), environmentCopy, recover);
+        publishEvent(EventType.STARTING, workspaceId, null);
+        List<Machine> machines = engine.start(workspaceId, environmentCopy, recover);
         List<MachineImpl> machinesImpls = machines.stream()
                                                   .map(MachineImpl::new)
                                                   .collect(Collectors.toList());
@@ -212,27 +213,31 @@ public class WorkspaceRuntimes {
                                                            .findAny();
         if (!devMachineOpt.isPresent()) {
             publishEvent(EventType.ERROR,
-                         workspace.getId(),
+                         workspaceId,
                          "Environment " + envName + " has booted but it doesn't contain dev machine. Environment has been stopped.");
             try {
-                engine.stop(workspace.getId());
+                engine.stop(workspaceId);
             } catch (Exception e) {
                 LOG.error(e.getLocalizedMessage(), e);
             }
             throw new ServerException("Environment " + envName +
                                       " has booted but it doesn't contain dev machine. Environment has been stopped.");
         } else {
-            publishEvent(EventType.RUNNING, workspace.getId(), null);
-            acquireWriteLock(workspace.getId());
+            acquireWriteLock(workspaceId);
             try {
-                WorkspaceRuntimeImpl runtime = descriptors.get(workspace.getId()).getRuntime();
+                RuntimeDescriptor descriptor = descriptors.get(workspaceId);
+                WorkspaceRuntimeImpl runtime = descriptor.getRuntime();
 
+                descriptor.setRuntimeStatus(WorkspaceStatus.RUNNING);
                 runtime.setMachines(machinesImpls);
                 runtime.setDevMachine(devMachineOpt.get());
             } finally {
-                releaseWriteLock(workspace.getId());
+                releaseWriteLock(workspaceId);
             }
-            return get(workspace.getId());
+            // Event publication should be performed outside of the lock
+            // as it may take some time to notify subscribers
+            publishEvent(EventType.RUNNING, workspaceId, null);
+            return get(workspaceId);
         }
     }
 
@@ -505,12 +510,13 @@ public class WorkspaceRuntimes {
                         return;
                     }
 
-                    if (descriptor.getRuntimeStatus() == WorkspaceStatus.STARTING) {
-                        envEngines.get(descriptor.getRuntime().getEnvType()).stop(workspaceId);
+                    if (descriptor.getRuntimeStatus() == WorkspaceStatus.RUNNING) {
+//                        descriptor.getRuntime().getMachines().add();
+                        LOG.error("Machine " + event.getMachineId() + " was added to workspace + " + workspaceId);
                     }
-                } catch (ServerException e) {
-                    LOG.error(e.getLocalizedMessage(), e);
-                } catch (NotFoundException ignore) {
+//                } catch (ServerException e) {
+//                    LOG.error(e.getLocalizedMessage(), e);
+//                } catch (NotFoundException ignore) {
                 } finally {
                     releaseWriteLock(workspaceId);
                 }
