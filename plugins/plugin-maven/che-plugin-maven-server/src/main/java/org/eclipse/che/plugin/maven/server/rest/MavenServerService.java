@@ -190,14 +190,12 @@ public class MavenServerService {
             int start = pomContent.indexOf("<project ") + 1;
             int end = start + "<project ".length();
 
-            List<Problem> problemList = problems.stream().map(mavenProjectProblem -> {
-                Problem problem = DtoFactory.newDto(Problem.class);
-                problem.setError(true);
-                problem.setSourceStart(start);
-                problem.setSourceEnd(end);
-                problem.setMessage(mavenProjectProblem.getDescription());
-                return problem;
-            }).collect(Collectors.toList());
+            List<Problem> problemList = problems.stream().map(mavenProjectProblem -> DtoFactory.newDto(Problem.class)
+                                                                                               .withError(true)
+                                                                                               .withSourceStart(start)
+                                                                                               .withSourceEnd(end)
+                                                                                               .withMessage(mavenProjectProblem.getDescription()))
+                                                .collect(Collectors.toList());
             result.addAll(problemList);
         } catch (ServerException | ForbiddenException | IOException e) {
             LOG.error(e.getMessage(), e);
