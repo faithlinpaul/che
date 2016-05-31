@@ -167,8 +167,11 @@ public class MavenServerService {
 
     @GET
     @Path("pom/reconcile")
+    @ApiOperation(value = "Reconcile pom.xml file")
+    @ApiResponses({@ApiResponse(code = 200, message = "OK")})
     @Produces("application/json")
-    public List<Problem> reconcilePom(@QueryParam("pompath") String pomPath) {
+    public List<Problem> reconcilePom(@ApiParam(value = "The paths to pom.xml file which need to be reconciled")
+                                      @QueryParam("pompath") String pomPath) {
         VirtualFileEntry entry = null;
         List<Problem> result = new ArrayList<>();
         try {
