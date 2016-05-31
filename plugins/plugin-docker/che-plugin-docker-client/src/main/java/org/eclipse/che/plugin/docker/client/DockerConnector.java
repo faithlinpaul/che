@@ -34,8 +34,8 @@ import org.eclipse.che.plugin.docker.client.json.ContainerCommitted;
 import org.eclipse.che.plugin.docker.client.json.ContainerConfig;
 import org.eclipse.che.plugin.docker.client.json.ContainerCreated;
 import org.eclipse.che.plugin.docker.client.json.ContainerExitStatus;
-import org.eclipse.che.plugin.docker.client.json.ContainerListEntry;
 import org.eclipse.che.plugin.docker.client.json.ContainerInfo;
+import org.eclipse.che.plugin.docker.client.json.ContainerListEntry;
 import org.eclipse.che.plugin.docker.client.json.ContainerProcesses;
 import org.eclipse.che.plugin.docker.client.json.Event;
 import org.eclipse.che.plugin.docker.client.json.ExecConfig;
@@ -46,36 +46,45 @@ import org.eclipse.che.plugin.docker.client.json.Filters;
 import org.eclipse.che.plugin.docker.client.json.HostConfig;
 import org.eclipse.che.plugin.docker.client.json.Image;
 import org.eclipse.che.plugin.docker.client.json.ImageInfo;
+import org.eclipse.che.plugin.docker.client.json.Network;
+import org.eclipse.che.plugin.docker.client.json.NetworkCreated;
 import org.eclipse.che.plugin.docker.client.json.ProgressStatus;
 import org.eclipse.che.plugin.docker.client.json.Version;
 import org.eclipse.che.plugin.docker.client.params.AttachContainerParams;
 import org.eclipse.che.plugin.docker.client.params.BuildImageParams;
 import org.eclipse.che.plugin.docker.client.params.CommitParams;
+import org.eclipse.che.plugin.docker.client.params.ConnectContainerToNetworkParams;
 import org.eclipse.che.plugin.docker.client.params.CreateContainerParams;
 import org.eclipse.che.plugin.docker.client.params.CreateExecParams;
+import org.eclipse.che.plugin.docker.client.params.CreateNetworkParams;
+import org.eclipse.che.plugin.docker.client.params.DisconnectContainerFromNetworkParams;
 import org.eclipse.che.plugin.docker.client.params.GetEventsParams;
 import org.eclipse.che.plugin.docker.client.params.GetExecInfoParams;
+import org.eclipse.che.plugin.docker.client.params.GetNetworksParams;
 import org.eclipse.che.plugin.docker.client.params.GetResourceParams;
 import org.eclipse.che.plugin.docker.client.params.InspectContainerParams;
 import org.eclipse.che.plugin.docker.client.params.InspectImageParams;
+import org.eclipse.che.plugin.docker.client.params.InspectNetworkParams;
 import org.eclipse.che.plugin.docker.client.params.KillContainerParams;
+import org.eclipse.che.plugin.docker.client.params.ListContainersParams;
 import org.eclipse.che.plugin.docker.client.params.PullParams;
 import org.eclipse.che.plugin.docker.client.params.PushParams;
 import org.eclipse.che.plugin.docker.client.params.PutResourceParams;
 import org.eclipse.che.plugin.docker.client.params.RemoveContainerParams;
 import org.eclipse.che.plugin.docker.client.params.RemoveImageParams;
+import org.eclipse.che.plugin.docker.client.params.RemoveNetworkParams;
 import org.eclipse.che.plugin.docker.client.params.StartContainerParams;
 import org.eclipse.che.plugin.docker.client.params.StartExecParams;
 import org.eclipse.che.plugin.docker.client.params.StopContainerParams;
 import org.eclipse.che.plugin.docker.client.params.TagParams;
 import org.eclipse.che.plugin.docker.client.params.TopParams;
 import org.eclipse.che.plugin.docker.client.params.WaitContainerParams;
-import org.eclipse.che.plugin.docker.client.params.ListContainersParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.core.MediaType;
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -1461,6 +1470,187 @@ public class DockerConnector {
     }
 
     /**
+     * Returns list of docker networks
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public List<Network> getNetworks() throws IOException {
+        return getNetworks(GetNetworksParams.create());
+    }
+
+    /**
+     * Returns list of docker networks which was filtered by {@link GetNetworksParams}
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public List<Network> getNetworks(GetNetworksParams params) throws IOException {
+        final Filters filters = params.getFilters();
+
+        try (DockerConnection connection = connectionFactory.openConnection(dockerDaemonUri)
+                                                            .method("GET")
+                                                            .path("/networks")) {
+            if (filters != null) {
+                connection.query("filters", urlPathSegmentEscaper().escape(JsonHelper.toJson(filters)));
+            }
+            DockerResponse response = connection.request();
+            if (response.getStatus() / 100 != 2) {
+                throw getDockerException(response);
+            }
+            return parseResponseStreamAsListAndClose(response.getInputStream(), new TypeToken<List<Network>>() {}.getType());
+        } catch (JsonParseException e) {
+            throw new IOException(e.getLocalizedMessage(), e);
+        }
+    }
+
+    /**
+     * Returns docker network matching provided id
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public Network inspectNetwork(@NotNull String netId) throws IOException {
+        return inspectNetwork(InspectNetworkParams.create(netId));
+    }
+
+    /**
+     * Returns docker network matching provided params
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public Network inspectNetwork(InspectNetworkParams params) throws IOException {
+        try (DockerConnection connection = connectionFactory.openConnection(dockerDaemonUri)
+                                                            .method("GET")
+                                                            .path("/network/" + params.getNetworkId())) {
+            final DockerResponse response = connection.request();
+            if (response.getStatus() / 100 != 2) {
+                throw getDockerException(response);
+            }
+            return parseResponseStreamAndClose(response.getInputStream(), Network.class);
+        } catch (JsonParseException e) {
+            throw new IOException(e.getLocalizedMessage(), e);
+        }
+    }
+
+    /**
+     * Creates docker network
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public NetworkCreated createNetwork(CreateNetworkParams params) throws IOException {
+        byte[] entityBytesArray = JsonHelper.toJson(params, FIRST_LETTER_LOWERCASE).getBytes();
+
+        try (DockerConnection connection = connectionFactory.openConnection(dockerDaemonUri)
+                                                            .method("POST")
+                                                            .path("/network/create")
+                                                            .header("Content-Type", MediaType.APPLICATION_JSON)
+                                                            .header("Content-Length", entityBytesArray.length)
+                                                            .entity(entityBytesArray)) {
+            final DockerResponse response = connection.request();
+            if (response.getStatus() / 100 != 2) {
+                throw getDockerException(response);
+            }
+            return parseResponseStreamAndClose(response.getInputStream(), NetworkCreated.class);
+        } catch (JsonParseException e) {
+            throw new IOException(e.getLocalizedMessage(), e);
+        }
+    }
+
+    /**
+     * Connects container to docker network
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public void connectContainerFromNetwork(String netId, String containerId) throws IOException {
+        connectContainerToNetwork(ConnectContainerToNetworkParams.create(netId, containerId));
+    }
+
+    /**
+     * Connects container to docker network
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public void connectContainerToNetwork(ConnectContainerToNetworkParams params) throws IOException {
+        byte[] entityBytesArray = JsonHelper.toJson(params, FIRST_LETTER_LOWERCASE).getBytes();
+
+        try (DockerConnection connection = connectionFactory.openConnection(dockerDaemonUri)
+                                                            .method("POST")
+                                                            .path("/network/" + params.getNetworkId() + "/connect")
+                                                            .header("Content-Type", MediaType.APPLICATION_JSON)
+                                                            .header("Content-Length", entityBytesArray.length)
+                                                            .entity(entityBytesArray)) {
+            final DockerResponse response = connection.request();
+            if (response.getStatus() / 100 != 2) {
+                throw getDockerException(response);
+            }
+        }
+    }
+
+    /**
+     * Disconnects container from docker network
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public void disconnectContainerFromNetwork(@NotNull String netId, @NotNull String containerId) throws IOException {
+        disconnectContainerFromNetwork(DisconnectContainerFromNetworkParams.create(netId, containerId));
+    }
+
+    /**
+     * Disconnects container from docker network
+     *
+     * @throws IOException
+     *         when problems occurs with docker api calls
+     */
+    public void disconnectContainerFromNetwork(DisconnectContainerFromNetworkParams params) throws IOException {
+        byte[] entityBytesArray = JsonHelper.toJson(params, FIRST_LETTER_LOWERCASE).getBytes();
+
+        try (DockerConnection connection = connectionFactory.openConnection(dockerDaemonUri)
+                                                            .method("POST")
+                                                            .path("/network/" + params.getNetworkId() + "/disconnect")
+                                                            .header("Content-Type", MediaType.APPLICATION_JSON)
+                                                            .header("Content-Length", entityBytesArray.length)
+                                                            .entity(entityBytesArray)) {
+            final DockerResponse response = connection.request();
+            if (response.getStatus() / 100 != 2) {
+                throw getDockerException(response);
+            }
+        }
+    }
+
+    /**
+     * Removes network matching provided id
+     *
+     * @throws IOException
+     *         when a problem occurs with docker api calls
+     */
+    public void removeNetwork(@NotNull String netId) throws IOException {
+        removeNetwork(RemoveNetworkParams.create(netId));
+    }
+
+    /**
+     * Removes network matching provided params
+     *
+     * @throws IOException
+     *         when a problem occurs with docker api calls
+     */
+    public void removeNetwork(RemoveNetworkParams params) throws IOException {
+        try (DockerConnection connection = connectionFactory.openConnection(dockerDaemonUri)
+                                                            .method("DELETE")
+                                                            .path("/network/" + params.getNetworkId())) {
+            final DockerResponse response = connection.request();
+            if (response.getStatus() / 100 != 2) {
+                throw getDockerException(response);
+            }
+        }
+    }
+
+    /**
      * See <a href="https://docs.docker.com/reference/api/docker_remote_api_v1.16/#create-an-image">Docker remote API # Create an
      * image</a>.
      * To pull from private registry use registry.address:port/image as image. This is not documented.
@@ -1719,5 +1909,4 @@ public class DockerConnector {
             connection.query(queryParamName, paramValue ? 1 : 0);
         }
     }
-
 }
