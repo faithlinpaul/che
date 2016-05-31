@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -61,7 +60,6 @@ public class CheEnvironmentEngine implements EnvironmentEngine {
     private final MachineManager                        machineManager;
     private final CheEnvironmentValidator               cheEnvironmentValidator;
     private final Map<String, List<MachineImpl>>        machines;
-    private final ReadWriteLock                         rwLock;
 
     private volatile boolean isPreDestroyInvoked;
 
@@ -71,7 +69,6 @@ public class CheEnvironmentEngine implements EnvironmentEngine {
         this.cheEnvironmentValidator = cheEnvironmentValidator;
         this.startQueues = new HashMap<>();
         this.machines = new HashMap<>();
-        this.rwLock = new ReentrantReadWriteLock();
     }
 
     @Override
@@ -97,22 +94,22 @@ public class CheEnvironmentEngine implements EnvironmentEngine {
         // Create a new start queue with a dev machine in the queue head
         final MachineConfigImpl devCfg = removeFirstMatching(configs, MachineConfig::isDev);
         configs.add(0, devCfg);
-        startQueues.put(workspaceId, new ArrayDeque<>(configs));
+        acquireWriteLock(workspaceId);
         try {
             startQueues.put(workspaceId, new ArrayDeque<>(configs));
             machines.put(workspaceId, new ArrayList<>());
         } finally {
-            rwLock.writeLock().unlock();
+            releaseWriteLock(workspaceId);
         }
+
         startQueue(workspaceId, env.getName(), recover);
-        rwLock.writeLock().lock();
-        List<MachineImpl> envMachines;
+
+        acquireWriteLock(workspaceId);
         try {
-            envMachines = this.machines.get(workspaceId);
+            return toListOfMachines(this.machines.get(workspaceId));
         } finally {
-            rwLock.writeLock().unlock();
+            releaseWriteLock(workspaceId);
         }
-        return toListOfMachines(envMachines);
     }
 
     @Override
@@ -122,31 +119,40 @@ public class CheEnvironmentEngine implements EnvironmentEngine {
         // In this case workspace start will be interrupted and
         // interruption will be reported, machine which is currently starting(if such exists)
         // will be destroyed by workspace starting thread.
-        startQueues.remove(workspaceId);
-        List<MachineImpl> machines = this.machines.get(workspaceId);
-        if (machines != null && !machines.isEmpty()) {
-            destroyRuntime(workspaceId, machines);
+        List<MachineImpl> machinesCopy = null;
+        acquireWriteLock(workspaceId);
+        try {
+            startQueues.remove(workspaceId);
+            List<MachineImpl> machines = this.machines.get(workspaceId);
+            if (machines != null && !machines.isEmpty()) {
+                machinesCopy = new ArrayList<>(machines);
+            }
+        } finally {
+            releaseWriteLock(workspaceId);
+        }
+        if (machinesCopy != null) {
+            destroyRuntime(workspaceId, machinesCopy);
         }
     }
 
     @VisibleForTesting
     void cleanupStartResources(String workspaceId) {
-        rwLock.writeLock().lock();
+        acquireWriteLock(workspaceId);
         try {
             machines.remove(workspaceId);
             startQueues.remove(workspaceId);
         } finally {
-            rwLock.writeLock().unlock();
+            releaseWriteLock(workspaceId);
         }
     }
 
     @VisibleForTesting
-    void removeRuntime(String wsId) {
-        rwLock.writeLock().lock();
+    void removeRuntime(String workspaceId) {
+        acquireWriteLock(workspaceId);
         try {
-            machines.remove(wsId);
+            machines.remove(workspaceId);
         } finally {
-            rwLock.writeLock().unlock();
+            releaseWriteLock(workspaceId);
         }
     }
 
@@ -158,7 +164,18 @@ public class CheEnvironmentEngine implements EnvironmentEngine {
     @VisibleForTesting
     void cleanup() {
         isPreDestroyInvoked = true;
-        startQueues.clear();
+        // Acquire all the locks
+        for (int i = 0; i < STRIPED.size(); i++) {
+            STRIPED.getAt(i).writeLock().lock();
+        }
+        try {
+            startQueues.clear();
+        } finally {
+            // Release all the locks
+            for (int i = 0; i < STRIPED.size(); i++) {
+                STRIPED.getAt(i).writeLock().unlock();
+            }
+        }
         // todo stop & cleanup machines
     }
 

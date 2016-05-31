@@ -368,15 +368,15 @@ public class WorkspaceRuntimes {
         eventService.unsubscribe(addMachineEventSubscriber);
         eventService.unsubscribe(removeMachineEventSubscriber);
 
-        // Acquire all the locks
-        for (int i = 0; i < STRIPED.size(); i++) {
-            STRIPED.getAt(i).writeLock().lock();
-        }
         final ExecutorService stopEnvExecutor =
                 Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
                                              new ThreadFactoryBuilder().setNameFormat("StopEnvironment-%d")
                                                                        .setDaemon(false)
                                                                        .build());
+        // Acquire all the locks
+        for (int i = 0; i < STRIPED.size(); i++) {
+            STRIPED.getAt(i).writeLock().lock();
+        }
         try {
             for (Map.Entry<String, RuntimeDescriptor> descriptorEntry : descriptors.entrySet()) {
                 if (descriptorEntry.getValue().getRuntimeStatus().equals(WorkspaceStatus.RUNNING) ||
