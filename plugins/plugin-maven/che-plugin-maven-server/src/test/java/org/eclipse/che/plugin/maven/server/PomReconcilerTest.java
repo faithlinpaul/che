@@ -130,22 +130,15 @@ public class PomReconcilerTest extends BaseTest {
     }
 
     @Test
-    public void testReconcilePomWhenDependencyIsNotFound() throws Exception {
-        String pomContent =  "<groupId>org.eclipse.che.examples</groupId>\n" +
-                             "<artifactId>web-java-spring</artifactId>\n" +
-                             "<packaging>war</packaging>\n" +
-                             "<version>1.0-SNAPSHOT</version>\n" +
-                             "<name>SpringDemo</name>" +
-                             "<dependencies>\n" +
-                             "    <dependency>\n" +
-                             "        <groupId>junit</groupId>\n" +
-                             "        <artifactId>junit</artifactId>\n" +
-                             "        <version>33333333.8.1</version>\n" +
-                             "        <scope>test</scope>\n" +
-                             "    </dependency>\n" +
-                             "</dependencies>";
+    public void testReconcilePomWhenPomContainsCorrectDependency() throws Exception {
+        String dependency = "    <dependency>\n" +
+                            "        <groupId>junit</groupId>\n" +
+                            "        <artifactId>junit</artifactId>\n" +
+                            "        <version>3.8.1</version>\n" +
+                            "        <scope>test</scope>\n" +
+                            "    </dependency>\n";
         MavenServerService serverService = new MavenServerService(null, projectRegistry, pm, projectManager, null, null);
-        FolderEntry testProject = createTestProject(PROJECT_NAME, pomContent);
+        FolderEntry testProject = createTestProject(PROJECT_NAME, getPomContentWithDependency(dependency));
         VirtualFileEntry pom = testProject.getChild("pom.xml");
         IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(PROJECT_NAME);
         mavenWorkspace.update(Collections.singletonList(project));
@@ -153,7 +146,84 @@ public class PomReconcilerTest extends BaseTest {
 
         List<Problem> problems = serverService.reconcilePom(String.format("/%s/pom.xml", PROJECT_NAME));
 
-        assertThat(problems).isNotEmpty();
+        assertThat(problems).isEmpty();
         assertThat(pom).isNotNull();
+    }
+
+    @Test
+    public void testReconcilePomWhenPomContainsDependecyWithIncorrectVersion() throws Exception {
+        String brokenDependency = "    <dependency>\n" +
+                                  "        <groupId>junit</groupId>\n" +
+                                  "        <artifactId>junit</artifactId>\n" +
+                                  "        <version>33333333.8.1</version>\n" +
+                                  "        <scope>test</scope>\n" +
+                                  "    </dependency>\n";
+        MavenServerService serverService = new MavenServerService(null, projectRegistry, pm, projectManager, null, null);
+        FolderEntry testProject = createTestProject(PROJECT_NAME, getPomContentWithDependency(brokenDependency));
+        VirtualFileEntry pom = testProject.getChild("pom.xml");
+        IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(PROJECT_NAME);
+        mavenWorkspace.update(Collections.singletonList(project));
+        mavenWorkspace.waitForUpdate();
+
+        List<Problem> problems = serverService.reconcilePom(String.format("/%s/pom.xml", PROJECT_NAME));
+
+        assertThat(problems).hasSize(1);
+        assertThat(problems.get(0).isError()).isTrue();
+        assertThat(pom).isNotNull();
+    }
+
+    @Test
+    public void testReconcilePomWhenPomContainsDependecyWithIncorrectGroupId() throws Exception {
+        String brokenDependency = "    <dependency>\n" +
+                                  "        <groupId>junittttt</groupId>\n" +
+                                  "        <artifactId>junit</artifactId>\n" +
+                                  "        <version>3.8.1</version>\n" +
+                                  "        <scope>test</scope>\n" +
+                                  "    </dependency>\n";
+        MavenServerService serverService = new MavenServerService(null, projectRegistry, pm, projectManager, null, null);
+        FolderEntry testProject = createTestProject(PROJECT_NAME, getPomContentWithDependency(brokenDependency));
+        VirtualFileEntry pom = testProject.getChild("pom.xml");
+        IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(PROJECT_NAME);
+        mavenWorkspace.update(Collections.singletonList(project));
+        mavenWorkspace.waitForUpdate();
+
+        List<Problem> problems = serverService.reconcilePom(String.format("/%s/pom.xml", PROJECT_NAME));
+
+        assertThat(problems).hasSize(1);
+        assertThat(problems.get(0).isError()).isTrue();
+        assertThat(pom).isNotNull();
+    }
+
+    @Test
+    public void testReconcilePomWhenPomContainsDependecyWithIncorrectAtrifactId() throws Exception {
+        String brokenDependency = "    <dependency>\n" +
+                                  "        <groupId>junit</groupId>\n" +
+                                  "        <artifactId>jjjjjjjunit</artifactId>\n" +
+                                  "        <version>3.8.1</version>\n" +
+                                  "        <scope>test</scope>\n" +
+                                  "    </dependency>\n";
+        MavenServerService serverService = new MavenServerService(null, projectRegistry, pm, projectManager, null, null);
+        FolderEntry testProject = createTestProject(PROJECT_NAME, getPomContentWithDependency(brokenDependency));
+        VirtualFileEntry pom = testProject.getChild("pom.xml");
+        IProject project = ResourcesPlugin.getWorkspace().getRoot().getProject(PROJECT_NAME);
+        mavenWorkspace.update(Collections.singletonList(project));
+        mavenWorkspace.waitForUpdate();
+
+        List<Problem> problems = serverService.reconcilePom(String.format("/%s/pom.xml", PROJECT_NAME));
+
+        assertThat(problems).hasSize(1);
+        assertThat(problems.get(0).isError()).isTrue();
+        assertThat(pom).isNotNull();
+    }
+
+    private String getPomContentWithDependency(String dependency) {
+        return String.format("<groupId>org.eclipse.che.examples</groupId>\n" +
+                             "<artifactId>web-java-spring</artifactId>\n" +
+                             "<packaging>war</packaging>\n" +
+                             "<version>1.0-SNAPSHOT</version>\n" +
+                             "<name>SpringDemo</name>" +
+                             "<dependencies>\n" +
+                             "%s" +
+                             "</dependencies>", dependency);
     }
 }
