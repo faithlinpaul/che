@@ -10,6 +10,7 @@
  *******************************************************************************/
 package org.eclipse.che.ide.api.git;
 
+import org.eclipse.che.api.core.model.project.ProjectConfig;
 import org.eclipse.che.api.git.shared.Branch;
 import org.eclipse.che.api.git.shared.CheckoutRequest;
 import org.eclipse.che.api.git.shared.Commiters;
@@ -63,7 +64,7 @@ public interface GitServiceClient {
      * @deprecated use {@link #add(String, Path, boolean, Path[])}
      */
     void add(DevMachine devMachine,
-             ProjectConfigDto projectConfig,
+             ProjectConfig projectConfig,
              boolean update,
              List<String> filePattern,
              RequestCallback<Void> callback) throws WebSocketException;
@@ -120,7 +121,7 @@ public interface GitServiceClient {
      */
     @Deprecated
     void branchList(DevMachine devMachine,
-                    ProjectConfigDto project,
+                    ProjectConfig project,
                     @Nullable String mode,
                     AsyncRequestCallback<List<Branch>> callback);
 
@@ -200,7 +201,7 @@ public interface GitServiceClient {
      */
     @Deprecated
     void checkout(DevMachine devMachine,
-                  ProjectConfigDto project,
+                  ProjectConfig project,
                   CheckoutRequest checkoutRequest,
                   AsyncRequestCallback<String> callback);
 
@@ -243,7 +244,7 @@ public interface GitServiceClient {
      * @deprecated use {@link #remoteList(String, Path, String, boolean)}
      */
     @Deprecated
-    Promise<List<Remote>> remoteList(DevMachine devMachine, ProjectConfigDto projectConfig, @Nullable String remoteName, boolean verbose);
+    Promise<List<Remote>> remoteList(DevMachine devMachine, ProjectConfig projectConfig, @Nullable String remoteName, boolean verbose);
 
     Promise<List<Remote>> remoteList(DevMachine devMachine, Path project, String remote, boolean verbose);
 
@@ -262,7 +263,7 @@ public interface GitServiceClient {
      */
     @Deprecated
     void remoteAdd(DevMachine devMachine,
-                   ProjectConfigDto project,
+                   ProjectConfig project,
                    String name,
                    String url,
                    AsyncRequestCallback<String> callback);
@@ -283,7 +284,7 @@ public interface GitServiceClient {
      */
     @Deprecated
     void remoteDelete(DevMachine devMachine,
-                      ProjectConfigDto project,
+                      ProjectConfig project,
                       String name,
                       AsyncRequestCallback<String> callback);
 
@@ -432,7 +433,7 @@ public interface GitServiceClient {
      */
     @Deprecated
     Promise<PushResponse> push(DevMachine devMachine,
-                               ProjectConfigDto project,
+                               ProjectConfig project,
                                List<String> refSpec,
                                String remote,
                                boolean force);
@@ -481,7 +482,7 @@ public interface GitServiceClient {
      */
     @Deprecated
     void commit(DevMachine devMachine,
-                ProjectConfigDto project,
+                ProjectConfig project,
                 String message,
                 boolean all,
                 boolean amend,
@@ -741,7 +742,7 @@ public interface GitServiceClient {
      * @deprecated use {@link #getStatus(String, Path)}
      */
     @Deprecated
-    Promise<Status> status(DevMachine devMachine, ProjectConfigDto project);
+    Promise<Status> status(DevMachine devMachine, ProjectConfig project);
 
     Promise<Status> getStatus(DevMachine devMachine, Path project);
 

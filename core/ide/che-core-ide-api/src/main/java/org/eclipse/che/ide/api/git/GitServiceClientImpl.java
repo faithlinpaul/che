@@ -14,6 +14,7 @@ import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
+import org.eclipse.che.api.core.model.project.ProjectConfig;
 import org.eclipse.che.api.git.shared.AddRequest;
 import org.eclipse.che.api.git.shared.Branch;
 import org.eclipse.che.api.git.shared.BranchCreateRequest;
@@ -238,7 +239,7 @@ public class GitServiceClientImpl implements GitServiceClient {
     /** {@inheritDoc} */
     @Override
     public void add(DevMachine devMachine,
-                    ProjectConfigDto project,
+                    ProjectConfig project,
                     boolean update,
                     @Nullable List<String> filePattern,
                     RequestCallback<Void> callback) throws WebSocketException {
@@ -300,7 +301,7 @@ public class GitServiceClientImpl implements GitServiceClient {
     /** {@inheritDoc} */
     @Override
     public void commit(DevMachine devMachine,
-                       ProjectConfigDto project,
+                       ProjectConfig project,
                        String message,
                        boolean all,
                        boolean amend,
@@ -404,7 +405,7 @@ public class GitServiceClientImpl implements GitServiceClient {
     }
 
     @Override
-    public Promise<PushResponse> push(DevMachine devMachine, ProjectConfigDto project, List<String> refSpec, String remote, boolean force) {
+    public Promise<PushResponse> push(DevMachine devMachine, ProjectConfig project, List<String> refSpec, String remote, boolean force) {
         PushRequest pushRequest = dtoFactory.createDto(PushRequest.class)
                                             .withRemote(remote)
                                             .withRefSpec(refSpec)
@@ -441,7 +442,7 @@ public class GitServiceClientImpl implements GitServiceClient {
 
     /** {@inheritDoc} */
     @Override
-    public Promise<List<Remote>> remoteList(DevMachine devMachine, ProjectConfigDto project, @Nullable String remoteName, boolean verbose) {
+    public Promise<List<Remote>> remoteList(DevMachine devMachine, ProjectConfig project, @Nullable String remoteName, boolean verbose) {
         RemoteListRequest remoteListRequest = dtoFactory.createDto(RemoteListRequest.class).withVerbose(verbose);
         if (remoteName != null) {
             remoteListRequest.setRemote(remoteName);
@@ -467,7 +468,7 @@ public class GitServiceClientImpl implements GitServiceClient {
     /** {@inheritDoc} */
     @Override
     public void branchList(DevMachine devMachine,
-                           ProjectConfigDto project,
+                           ProjectConfig project,
                            @Nullable String remoteMode,
                            AsyncRequestCallback<List<Branch>> callback) {
         BranchListRequest branchListRequest = dtoFactory.createDto(BranchListRequest.class).withListMode(remoteMode);
@@ -483,7 +484,7 @@ public class GitServiceClientImpl implements GitServiceClient {
     }
 
     @Override
-    public Promise<Status> status(DevMachine devMachine, ProjectConfigDto project) {
+    public Promise<Status> status(DevMachine devMachine, ProjectConfig project) {
         final String params = "?projectPath=" + project.getPath() + "&format=" + PORCELAIN;
         final String url = devMachine.getWsAgentBaseUrl() + STATUS + params;
         return asyncRequestFactory.createPostRequest(url, null)
@@ -579,7 +580,7 @@ public class GitServiceClientImpl implements GitServiceClient {
     /** {@inheritDoc} */
     @Override
     public void checkout(DevMachine devMachine,
-                         ProjectConfigDto project,
+                         ProjectConfig project,
                          CheckoutRequest checkoutRequest,
                          AsyncRequestCallback<String> callback) {
         String url = appContext.getDevMachine().getWsAgentBaseUrl() + CHECKOUT + "?projectPath=" + project.getPath();
@@ -702,7 +703,7 @@ public class GitServiceClientImpl implements GitServiceClient {
     /** {@inheritDoc} */
     @Override
     public void remoteAdd(DevMachine devMachine,
-                          ProjectConfigDto project,
+                          ProjectConfig project,
                           String name,
                           String repositoryURL,
                           AsyncRequestCallback<String> callback) {
@@ -721,7 +722,7 @@ public class GitServiceClientImpl implements GitServiceClient {
     /** {@inheritDoc} */
     @Override
     public void remoteDelete(DevMachine devMachine,
-                             ProjectConfigDto project,
+                             ProjectConfig project,
                              String name,
                              AsyncRequestCallback<String> callback) {
         String url = appContext.getDevMachine().getWsAgentBaseUrl() + REMOTE_DELETE + '/' + name + "?projectPath=" + project.getPath();

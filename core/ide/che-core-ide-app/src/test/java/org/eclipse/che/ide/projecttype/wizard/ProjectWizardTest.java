@@ -13,6 +13,7 @@ package org.eclipse.che.ide.projecttype.wizard;
 import com.google.common.base.Optional;
 
 import org.eclipse.che.api.core.model.project.ProjectConfig;
+import org.eclipse.che.api.promises.client.Function;
 import org.eclipse.che.api.promises.client.Operation;
 import org.eclipse.che.api.promises.client.Promise;
 import org.eclipse.che.api.promises.client.PromiseError;
@@ -142,6 +143,7 @@ public class ProjectWizardTest {
         when(createProjectRequest.withBody(any(ProjectConfig.class))).thenReturn(createProjectRequest);
         when(createProjectRequest.send()).thenReturn(createProjectPromise);
         when(createProjectPromise.then(any(Operation.class))).thenReturn(createProjectPromise);
+        when(createProjectPromise.thenPromise(any(Function.class))).thenReturn(createProjectPromise);
         when(createProjectPromise.catchError(any(Operation.class))).thenReturn(createProjectPromise);
         when(promiseError.getCause()).thenReturn(exception);
 
@@ -161,6 +163,7 @@ public class ProjectWizardTest {
         when(createProjectRequest.withBody(any(ProjectConfig.class))).thenReturn(createProjectRequest);
         when(createProjectRequest.send()).thenReturn(createProjectPromise);
         when(createProjectPromise.then(any(Operation.class))).thenReturn(createProjectPromise);
+        when(createProjectPromise.thenPromise(any(Function.class))).thenReturn(createProjectPromise);
         when(createProjectPromise.catchError(any(Operation.class))).thenReturn(createProjectPromise);
         when(promiseError.getCause()).thenReturn(exception);
 

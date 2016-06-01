@@ -11,7 +11,6 @@
 package org.eclipse.che.ide.resources.impl;
 
 import com.google.common.annotations.Beta;
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.inject.Inject;
 import com.google.inject.assistedinject.Assisted;
@@ -51,8 +50,9 @@ import org.eclipse.che.ide.context.AppContextImpl;
 import org.eclipse.che.ide.dto.DtoFactory;
 import org.eclipse.che.ide.resource.Path;
 
-import javax.annotation.Nullable;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.google.common.base.Optional.absent;
@@ -61,7 +61,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static com.google.common.collect.Iterables.transform;
 import static java.lang.System.arraycopy;
 import static java.util.Arrays.copyOf;
 import static org.eclipse.che.ide.api.resources.Resource.FILE;
@@ -193,6 +192,12 @@ public final class ResourceManager {
                         final Project project = resourceFactory.newProjectImpl(config, ResourceManager.this);
                         store.register(Path.ROOT, project);
 
+                        final Optional<ProblemProjectMarker> optionalMarker = getProblemMarker(config);
+
+                        if (optionalMarker.isPresent()) {
+                            project.addMarker(optionalMarker.get());
+                        }
+
                         Project[] tmpProjects = copyOf(projects, projects.length + 1);
                         tmpProjects[projects.length] = project;
                         projects = tmpProjects;
@@ -245,13 +250,22 @@ public final class ResourceManager {
      */
     protected Promise<Project> update(final Path path, final ProjectRequest request) {
 
+        final SourceStorageDto sourceDto = dtoFactory.createDto(SourceStorageDto.class);
+
+        if (request.getBody().getSource() != null) {
+            sourceDto.setLocation(request.getBody().getSource().getLocation());
+            sourceDto.setType(request.getBody().getSource().getType());
+            sourceDto.setParameters(request.getBody().getSource().getParameters());
+        }
+
         final ProjectConfigDto dto = dtoFactory.createDto(ProjectConfigDto.class)
                                                .withName(request.getBody().getName())
                                                .withPath(path.toString())
                                                .withDescription(request.getBody().getDescription())
                                                .withType(request.getBody().getType())
                                                .withMixins(request.getBody().getMixins())
-                                               .withAttributes(request.getBody().getAttributes());
+                                               .withAttributes(request.getBody().getAttributes())
+                                               .withSource(sourceDto);
 
         return ps.updateProject(devMachine, dto).thenPromise(new Function<ProjectConfigDto, Promise<Project>>() {
             @Override
@@ -402,7 +416,7 @@ public final class ResourceManager {
         checkArgument(checkProjectName(createRequest.getBody().getName()), "Invalid project name");
         checkArgument(typeRegistry.getProjectType(createRequest.getBody().getType()) != null, "Invalid project type");
 
-        final Path path = Path.valueOf(createRequest.getBody().getPath()).append(createRequest.getBody().getName());
+        final Path path = Path.valueOf(createRequest.getBody().getPath());
 
         return findResource(path, true).thenPromise(new Function<Optional<Resource>, Promise<Project>>() {
             @Override
@@ -453,8 +467,8 @@ public final class ResourceManager {
 
         return findResource(path, true).thenPromise(new Function<Optional<Resource>, Promise<Project>>() {
             @Override
-            public Promise<Project> apply(Optional<Resource> resource) throws FunctionException {
-                checkState(!resource.isPresent(), "Resource already exists");
+            public Promise<Project> apply(final Optional<Resource> resource) throws FunctionException {
+//                checkState(resource.isPresent() && resource.get().isProject() && !((Project)resource.get()).exists(), "Resource already exists");
 
                 final SourceStorage sourceStorage = importRequest.getBody().getSource();
                 final SourceStorageDto sourceStorageDto = dtoFactory.createDto(SourceStorageDto.class)
@@ -466,19 +480,19 @@ public final class ResourceManager {
                     @Override
                     public Project apply(Void ignored) throws FunctionException {
 
-                        Resource resource = resourceFactory.newProjectImpl(importRequest.getBody(), ResourceManager.this);
+                        Resource project = resourceFactory.newProjectImpl(importRequest.getBody(), ResourceManager.this);
 
-                        checkState(resource != null, "Failed to locate imported project's configuration");
+                        checkState(project != null, "Failed to locate imported project's configuration");
 
-                        store.register(resource.getLocation().parent(), resource);
+                        store.register(project.getLocation().parent(), project);
 
                         for (ResourceInterceptor interceptor : resourceInterceptors) {
-                            resource = interceptor.intercept(resource);
+                            project = interceptor.intercept(project);
                         }
 
-                        eventBus.fireEvent(new ResourceChangedEvent(new ResourceDeltaImpl(resource, ADDED | DERIVED)));
+                        eventBus.fireEvent(new ResourceChangedEvent(new ResourceDeltaImpl(project, (resource.isPresent() ? UPDATED : ADDED) | DERIVED)));
 
-                        return (Project)resource;
+                        return (Project)project;
                     }
                 });
             }
@@ -883,19 +897,12 @@ public final class ResourceManager {
             return absent();
         }
 
-        final String warnings = Joiner.on('\n').join(transform(problems, new com.google.common.base.Function<ProjectProblemDto, String>() {
-            @Nullable
-            @Override
-            public String apply(@Nullable ProjectProblemDto input) {
-                checkNotNull(input);
+        Map<Integer, String> code2Message = new HashMap<>(problems.size());
+        for (ProjectProblemDto problem : problems) {
+            code2Message.put(problem.getCode(), problem.getMessage());
+        }
 
-                return input.getMessage();
-            }
-        }));
-
-        final ProblemProjectMarker problemMarker = new ProblemProjectMarker();
-
-        return of(problemMarker);
+        return of(new ProblemProjectMarker(code2Message));
     }
 
     protected Promise<Resource[]> synchronize(final Container container) {

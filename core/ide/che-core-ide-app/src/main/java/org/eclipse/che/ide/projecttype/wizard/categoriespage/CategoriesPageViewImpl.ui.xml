@@ -44,8 +44,7 @@
                         <g:FlowPanel height="65px" addStyleNames="{styles.namePanel}">
                             <g:Label text="Parent:"
                                      addStyleNames="{styles.labelPosition}"/>
-                            <g:TextBox ui:field="parentPath" addStyleNames="{styles.inputFieldPosition}" tabIndex="1"
-                                       debugId="file-newProject-projectName" readOnly="true"/>
+                            <g:Label ui:field="parentPath" addStyleNames="{styles.inputFieldPosition}"/>
                             <g:Button ui:field="selectPath" text="…" addStyleNames="{style.selectPathButton}"/>
                         </g:FlowPanel>
 

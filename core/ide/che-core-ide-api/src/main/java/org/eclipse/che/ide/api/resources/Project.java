@@ -11,6 +11,7 @@
 package org.eclipse.che.ide.api.resources;
 
 import com.google.common.annotations.Beta;
+import com.google.common.base.MoreObjects;
 
 import org.eclipse.che.api.core.model.project.ProjectConfig;
 import org.eclipse.che.api.project.shared.dto.SourceEstimation;
@@ -18,7 +19,9 @@ import org.eclipse.che.api.promises.client.Promise;
 import org.eclipse.che.ide.api.app.AppContext;
 import org.eclipse.che.ide.api.resources.marker.Marker;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * An object that represents client side project.
@@ -91,6 +94,16 @@ public interface Project extends Container, ProjectConfig {
     boolean isProblem();
 
     /**
+     * Returns the {@code true} if project physically exists on the file system.
+     * <p>
+     * Project may not be exists on file system, but workspace may has configured in the current workspace.
+     *
+     * @return {@code true} if project physically exists on the file system, otherwise {@code false}
+     * @since 4.3.0
+     */
+    boolean exists();
+
+    /**
      * Resolve possible project types for current {@link Project}.
      * <p/>
      * These source estimations may be useful for automatically project type detection.
@@ -145,6 +158,8 @@ public interface Project extends Container, ProjectConfig {
     @Beta
     class ProblemProjectMarker implements Marker {
 
+        private Map<Integer, String> problems;
+
         /**
          * Marker type, which should be used when marker requests.
          *
@@ -152,10 +167,18 @@ public interface Project extends Container, ProjectConfig {
          */
         public static final String PROBLEM_PROJECT = "problemProjectMarker";
 
+        public ProblemProjectMarker(Map<Integer, String> problems) {
+            this.problems = MoreObjects.firstNonNull(problems, Collections.<Integer, String>emptyMap());
+        }
+
         /** {@inheritDoc} */
         @Override
         public String getType() {
             return PROBLEM_PROJECT;
+        }
+
+        public Map<Integer, String> getProblems() {
+            return problems;
         }
     }
 

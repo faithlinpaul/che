@@ -12,6 +12,7 @@ package org.eclipse.che.ide.resources.impl;
 
 import com.google.common.annotations.Beta;
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Optional;
 import com.google.inject.Inject;
 import com.google.inject.assistedinject.Assisted;
 
@@ -21,6 +22,7 @@ import org.eclipse.che.api.project.shared.dto.SourceEstimation;
 import org.eclipse.che.api.promises.client.Promise;
 import org.eclipse.che.api.promises.client.PromiseProvider;
 import org.eclipse.che.ide.api.resources.Project;
+import org.eclipse.che.ide.api.resources.marker.Marker;
 import org.eclipse.che.ide.resource.Path;
 
 import java.util.List;
@@ -39,6 +41,8 @@ import static java.util.Collections.unmodifiableMap;
  */
 @Beta
 class ProjectImpl extends ContainerImpl implements Project {
+
+    private static final int FOLDER_NOT_EXISTS_ON_FS = 10;
 
     private final ProjectConfig reference;
 
@@ -124,6 +128,14 @@ class ProjectImpl extends ContainerImpl implements Project {
     @Override
     public boolean isProblem() {
         return getMarker(ProblemProjectMarker.PROBLEM_PROJECT).isPresent();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean exists() {
+        final Optional<Marker> problemMarker = getMarker(ProblemProjectMarker.PROBLEM_PROJECT);
+
+        return !problemMarker.isPresent() || !((ProblemProjectMarker)problemMarker.get()).getProblems().containsKey(FOLDER_NOT_EXISTS_ON_FS);
     }
 
     /** {@inheritDoc} */

@@ -10,6 +10,7 @@
  *******************************************************************************/
 package org.eclipse.che.ide.ext.git.client;
 
+import org.eclipse.che.api.core.model.project.ProjectConfig;
 import org.eclipse.che.ide.api.resources.Project;
 
 import java.util.List;
@@ -25,6 +26,10 @@ public class GitUtil {
     public static final String VCS_ATTRIBUTE = "vcs.provider.name";
 
     public static boolean isUnderGit(Project project) {
+        return isUnderGit((ProjectConfig)project);
+    }
+
+    public static boolean isUnderGit(ProjectConfig project) {
         checkArgument(project != null, "Null project occurred");
 
         final Map<String, List<String>> attributes = project.getAttributes();

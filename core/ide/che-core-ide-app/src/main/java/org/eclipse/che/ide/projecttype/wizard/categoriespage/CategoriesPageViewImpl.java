@@ -122,7 +122,7 @@ public class CategoriesPageViewImpl implements CategoriesPageView {
     @UiField
     Button selectPath;
     @UiField
-    TextBox parentPath;
+    Label parentPath;
 
     private ActionDelegate                              delegate;
     private Map<String, Set<ProjectTypeDto>>            typesByCategory;
